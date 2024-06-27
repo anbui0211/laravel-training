@@ -7,9 +7,6 @@ use Aws\S3\S3Client;
 
 function ensureBucketExists($bucketName)
 {
-
-    dd($bucketName);
-
     $s3Client = new S3Client([
         'version' => 'latest',
         'region'  => env('AWS_DEFAULT_REGION'),
@@ -25,7 +22,6 @@ function ensureBucketExists($bucketName)
         $result = $s3Client->headBucket(['Bucket' => $bucketName]);
     } catch (AwsException $e) {
         if ($e->getAwsErrorCode() == 'NotFound') {
-            dd($e);
             $s3Client->createBucket(['Bucket' => $bucketName]);
         } else {
             throw $e;

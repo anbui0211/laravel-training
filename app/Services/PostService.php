@@ -2,72 +2,62 @@
 
 namespace App\Services;
 
-
 use App\Repositories\PostRepositoryInterface;
-
-use function App\Helpers\randomData2;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class PostService
 {
 
-  public function __construct(private PostRepositoryInterface $postRepo)
-  {
-  }
+	public function __construct(private PostRepositoryInterface $postRepo)
+	{
+	}
 
-  public function index()
-  {
-    $relation = ['user:id,name'];
-    return $this->postRepo->findWithByRelation($relation);
-  }
+	public function index()
+	{
+		$relation = ['user:id,name'];
+		return $this->postRepo->findWithByRelation($relation);
+	}
 
-  public function store(array $data)
-  {
-    $file = $data['image'];
-    $extension = $file->getClientOriginalExtension();
-    $filename = time() . '.' . $extension;
-    // $path = 'uploads/images/post/' ;
-    // $file->move($path, $filename);
+	public function store(array $data)
+	{
+		$file = $data['image'];
+		$extension = $file->getClientOriginalExtension();
+		$filename = time() . '.' . $extension;
 
-    // Save the image file to local 
-    $imageLocalPath = $file->storeAs('uploads/images/post/', $filename);
+		// Save the image file to local 
+		$imageLocalPath = $file->storeAs('public/images/post', $filename);
 
-    // Check if the bucket exists
-    $awsBucket = config('filesystems.disks.s3');
+		// Check if the bucket exists
+		$awsBucket = config('filesystems.disks.s3.bucket');
+		ensureBucketExists($awsBucket);
 
-    dd($awsBucket);
-    dd(randomData2());
-    ensureBucketExists($awsBucket);
-    // Create s3 path 
-    // $s3Path = 'kozo/images/post';
-    // Save image to the S3 bucket
-    $imageS3Path = $file->storeAs('kozo/images/post', $filename, 's3');
+		// Upload to s3 and return image path  
+		$imageS3Path = $file->storeAs('images/post', $filename, 's3');
 
+		$postCreate = [
+			'title' => $data['title'],
+			'content' => $data['content'],
+			'user_id' => $data['user_id'],
+			'image_local' => $imageLocalPath,
+			'image_s3' => $awsBucket . '/' . $imageS3Path,
+		];
+		$this->postRepo->insert($postCreate);
+	}
 
+	public function update(array $data)
+	{
+		$id = $data['id'];
+		$arrUpdate = [
+			'title' => $data['title'],
+			'content' => $data['content'],
+		];
 
-    $postCreate = [
-      'title' => $data['title'],
-      'content' => $data['content'],
-      'user_id' => $data['user_id'],
-      'image_local' => $imageLocalPath . $filename,
-      'image_s3' => $imageS3Path . $filename,
-    ];
+		$this->postRepo->update($arrUpdate, $id);
+	}
 
-    $this->postRepo->insert($postCreate);
-  }
-
-  public function update(array $data)
-  {
-    $id = $data['id'];
-    $arrUpdate = [
-      'title' => $data['title'],
-      'content' => $data['content'],
-    ];
-
-    $this->postRepo->update($arrUpdate, $id);
-  }
-
-  public function destroy($id)
-  {
-    return $this->postRepo->delete($id);
-  }
+	public function destroy($id)
+	{
+		return $this->postRepo->delete($id);
+	}
 }
